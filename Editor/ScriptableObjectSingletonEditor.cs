@@ -1,12 +1,15 @@
-using PhantasmicGames.SuperSingletons;
-using System.Reflection;
-using UnityEditor;
-using UnityEngine;
 using System;
+using System.Linq;
+using System.Reflection;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+using PhantasmicGames.SuperSingletons;
+using PhantasmicGames.Common;
 
 using UnityObject = UnityEngine.Object;
-using PhantasmicGames.Common;
-using UnityEditor.Build;
 
 namespace SuperSingletonsEditor
 {
@@ -14,6 +17,8 @@ namespace SuperSingletonsEditor
 	[CanEditMultipleObjects]
 	public class ScriptableObjectSingletonEditor : Editor
 	{
+		private const string kNotAScriptableObjectSingletonMessage = "The ScriptableObject does not inherit ScriptableObjectSingleton<TScriptableObject>!";
+
 		private Type m_Type;
 		private string m_Name;
 		private GUIContent m_Label;
@@ -25,7 +30,7 @@ namespace SuperSingletonsEditor
 		{
 			m_Type = target.GetType();
 			m_Name = m_Type.Name;
-			m_Label = new GUIContent($"Main {m_Name}: ");
+			m_Label = new GUIContent($"Main '{m_Name}': ");
 			m_ConfigName = GetConfigName(target as ScriptableObject);
 			EditorBuildSettings.TryGetConfigObject(m_ConfigName, out m_CurrentMainInstance);
 		}
@@ -66,18 +71,27 @@ namespace SuperSingletonsEditor
 			EditorGUILayout.EndVertical();
 		}
 
-		public static bool IsScriptableObjectSingleton(ScriptableObject scriptableObject, out Type genericType)
-		{
-			return Utility.TypeInheritsGenericTypeDefinition(scriptableObject.GetType(), typeof(ScriptableObjectSingleton<>), out genericType);
-		}
-
 		public static string GetConfigName(ScriptableObject scriptableObjectSingleton)
 		{
 			if (Utility.TypeInheritsGenericTypeDefinition(scriptableObjectSingleton.GetType(), typeof(ScriptableObjectSingleton<>), out Type genericType))
 			{
 				return (string)genericType.GetProperty("s_ConfigName", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
 			}
-			throw new Exception($"The ScriptableObject does not inherit ScriptableObjectSingleton<TScriptableObject>!");
+			throw new Exception(kNotAScriptableObjectSingletonMessage);
+		}
+
+		public static bool IsScriptableObjectSingleton(ScriptableObject scriptableObject, out Type genericType)
+		{
+			return Utility.TypeInheritsGenericTypeDefinition(scriptableObject.GetType(), typeof(ScriptableObjectSingleton<>), out genericType);
+		}
+
+		public static bool IncludedInBuild(ScriptableObject scriptableObjectSingleton)
+		{
+			if (Utility.TypeInheritsGenericTypeDefinition(scriptableObjectSingleton.GetType(), typeof(ScriptableObjectSingleton<>), out Type type))
+			{
+				return (bool)type.GetProperty("includeInBuild", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(scriptableObjectSingleton);
+			}
+			throw new Exception(kNotAScriptableObjectSingletonMessage);
 		}
 
 		public static void SetAsMainInstance(ScriptableObject scriptableObjectSingleton, bool value)
@@ -125,6 +139,47 @@ namespace SuperSingletonsEditor
 					else if(currentMain != scriptableObject)
 						SetAsMainInstance(scriptableObject, false);
 				}
+			}
+		}
+
+		private class BuildProcessor : IPreprocessBuildWithReport, IPostprocessBuildWithReport
+		{
+			public int callbackOrder => 1;
+
+			public void OnPreprocessBuild(BuildReport report)
+			{
+				RemoveScriptableObjectSingletonsFromPreloadedAssets();
+
+				var scriptableObjectSingletons = Resources.FindObjectsOfTypeAll<ScriptableObject>().Where(so => IsScriptableObjectSingleton(so, out _)).ToArray();
+				if (scriptableObjectSingletons == null)
+					return;
+
+				var preloadedAssets = PlayerSettings.GetPreloadedAssets().ToList();
+				foreach (var sos in scriptableObjectSingletons)
+				{
+					if (!IncludedInBuild(sos))
+						continue;
+
+					if (!preloadedAssets.Contains(sos))
+						preloadedAssets.Add(sos);
+				}
+
+				PlayerSettings.SetPreloadedAssets(preloadedAssets.ToArray());
+			}
+
+			public void OnPostprocessBuild(BuildReport report)
+			{
+				RemoveScriptableObjectSingletonsFromPreloadedAssets();
+			}
+
+			private void RemoveScriptableObjectSingletonsFromPreloadedAssets()
+			{
+				List<UnityObject> preloadedAssets = PlayerSettings.GetPreloadedAssets().ToList();
+				if (preloadedAssets == null)
+					return;
+
+				preloadedAssets.RemoveAll(a => (a is ScriptableObject && IsScriptableObjectSingleton(a as ScriptableObject, out _)));
+				PlayerSettings.SetPreloadedAssets(preloadedAssets.ToArray());
 			}
 		}
 	}
