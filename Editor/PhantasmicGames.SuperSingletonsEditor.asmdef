@@ -1,0 +1,19 @@
+{
+    "name": "PhantasmicGames.SuperSingletonsEditor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:f7b84b92d7f8c9143a4397194e8a614f",
+        "GUID:84d59d38f53b6334497472301532de94"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
