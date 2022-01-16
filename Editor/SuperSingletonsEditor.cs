@@ -65,7 +65,7 @@ namespace PhantasmicGames.SuperSingletonsEditor
 			return false;
 		}
 
-		private static string GetConfigName(Type singletonType)
+		public static string GetConfigName(Type singletonType)
 		{
 			if (!Utility.TypeInheritsGenericTypeDefinition(singletonType, typeof(ScriptableObjectSingleton<>), out Type genericTypeDefinition))
 				Utility.TypeInheritsGenericTypeDefinition(singletonType, typeof(MonoBehaviourSingleton<>), out genericTypeDefinition);
@@ -73,13 +73,6 @@ namespace PhantasmicGames.SuperSingletonsEditor
 			if (genericTypeDefinition == null)
 				throw new Exception("'singletonType' does not derived from either ScriptableObjectSingleton<> or MonoBehaviourSingleton<>!");
 			return (string)genericTypeDefinition.GetProperty("s_ConfigName", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
-		}
-
-		public static string GetConfigName(UnityObject singleton)
-		{
-			if (IsSingletonAsset(singleton, out Type type, out _))
-				return GetConfigName(type);
-			throw new Exception("The Object is neither a MonoBehaviourSingleton or ScriptableObjectSingleton!");
 		}
 
 		public static void SetIsMain(UnityObject singletonAsset, Type singletonGenericDefinition, bool value)
