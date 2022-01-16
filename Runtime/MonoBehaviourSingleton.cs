@@ -13,8 +13,9 @@ namespace PhantasmicGames.SuperSingletons
 		private static TMonoBehaviour s_Instance;
 		private static readonly object s_Lock = new object();
 
+#pragma warning disable CS0414
 		[SerializeField, HideInInspector] private bool m_IsMain = true;
-
+#pragma warning restore CS0414
 
 		public static TMonoBehaviour instance
 		{
