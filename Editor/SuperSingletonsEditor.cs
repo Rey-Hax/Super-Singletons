@@ -33,12 +33,17 @@ namespace PhantasmicGames.SuperSingletonsEditor
 				result = IsMonoBehaviourSingletonPrefab(obj as GameObject, out singletonGenericDefinition, out MonoBehaviour monoBehaviour);
 				singleton = monoBehaviour;
 			}
+			else if (obj is MonoBehaviour)
+			{
+				result = IsMonoBehaviourSingleton(obj as MonoBehaviour, out singletonGenericDefinition);
+				singleton = obj;
+			}
 			return result;
 		}
 
-		public static bool IsScriptableObjectSingleton(ScriptableObject scriptableObject, out Type singletonGenericDefinition)
+		public static bool IsScriptableObjectSingleton(ScriptableObject scriptableObject, out Type singletonGenericTypeDefinition)
 		{
-			return Utility.TypeInheritsGenericTypeDefinition(scriptableObject.GetType(), typeof(ScriptableObjectSingleton<>), out singletonGenericDefinition);
+			return Utility.TypeInheritsGenericTypeDefinition(scriptableObject.GetType(), typeof(ScriptableObjectSingleton<>), out singletonGenericTypeDefinition);
 		}
 
 		public static bool IncludedInBuild(ScriptableObject scriptableObjectSingleton)
@@ -50,18 +55,25 @@ namespace PhantasmicGames.SuperSingletonsEditor
 			throw new Exception("The ScriptableObject does not inherit ScriptableObjectSingleton<TScriptableObject>!");
 		}
 
-		public static bool IsMonoBehaviourSingletonPrefab(GameObject prefab, out Type singletonGenericDefinition, out MonoBehaviour monoBehaviourSingleton)
+		public static bool IsMonoBehaviourSingletonPrefab(GameObject prefab, out Type singletonGenericTypeDefinition, out MonoBehaviour monoBehaviourSingleton)
 		{
 			foreach (var monoBehaviour in prefab.GetComponents<MonoBehaviour>())
 			{
-				if (Utility.TypeInheritsGenericTypeDefinition(monoBehaviour.GetType(), typeof(MonoBehaviourSingleton<>), out singletonGenericDefinition))
+				if (IsMonoBehaviourSingleton(monoBehaviour, out singletonGenericTypeDefinition))
 				{
 					monoBehaviourSingleton = monoBehaviour;
 					return true;
 				}
 			}
-			singletonGenericDefinition = null;
+			singletonGenericTypeDefinition = null;
 			monoBehaviourSingleton = null;
+			return false;
+		}
+
+		public static bool IsMonoBehaviourSingleton(MonoBehaviour monoBehaviour, out Type singletonGenericTypeDefinition)
+		{
+			if (Utility.TypeInheritsGenericTypeDefinition(monoBehaviour.GetType(), typeof(MonoBehaviourSingleton<>), out singletonGenericTypeDefinition))
+				return true;
 			return false;
 		}
 
@@ -75,24 +87,54 @@ namespace PhantasmicGames.SuperSingletonsEditor
 			return (string)genericTypeDefinition.GetProperty("s_ConfigName", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
 		}
 
-		public static void SetIsMain(UnityObject singletonAsset, Type singletonGenericDefinition, bool value)
+		public static void SetIsMain(UnityObject singletonAsset, bool value)
 		{
-			var configName = GetConfigName(singletonGenericDefinition);
+			if (!IsSingletonAsset(singletonAsset, out Type genericTypeDefinition, out UnityObject singleton))
+				throw new Exception("'singletonAsset' is neither a ScriptableObjectSingleton<> or a MonoBehaviourSingleton<>!");
 
-			var isMainField = singletonGenericDefinition.GetField("m_IsMain", BindingFlags.NonPublic | BindingFlags.Instance);
+			var configName = GetConfigName(genericTypeDefinition);
 
-			isMainField.SetValue(singletonAsset, value);
+			var isMainField = genericTypeDefinition.GetField("m_IsMain", BindingFlags.NonPublic | BindingFlags.Instance);
+			isMainField.SetValue(singleton, value);
 
 			if (EditorBuildSettings.TryGetConfigObject(configName, out UnityObject currentMain))
 			{
-				if (value && singletonAsset != currentMain)
+				if (value && singleton != currentMain)
 					isMainField.SetValue(currentMain, false);
-				else if (!value && singletonAsset == currentMain)
+				else if (!value && singleton == currentMain)
 					EditorBuildSettings.RemoveConfigObject(configName);
 			}
 
 			if (value)
-				EditorBuildSettings.AddConfigObject(configName, singletonAsset, true);
+				EditorBuildSettings.AddConfigObject(configName, singleton, true);
+		}
+
+		public static UnityObject SetMainSingletonGUI(UnityObject target, UnityObject current, Type singletonType)
+		{
+			EditorGUILayout.BeginVertical("Box");
+			EditorGUILayout.HelpBox($"This '{singletonType.Name}' is not set as the main '{singletonType.Name}'.", MessageType.Warning);
+
+			EditorGUILayout.BeginHorizontal();
+			var label = new GUIContent($"Main '{singletonType.Name}': ");
+			EditorGUILayout.LabelField($"Main '{singletonType.Name}': ", GUILayout.MaxWidth(GUIStyle.none.CalcSize(label).x));
+			using (new EditorGUI.DisabledScope(true))
+				EditorGUILayout.ObjectField(current, singletonType, false);
+			EditorGUILayout.EndHorizontal();
+
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.FlexibleSpace();
+
+			if (GUILayout.Button($"Set this as Main", GUILayout.MaxWidth(250)))
+			{
+				SetIsMain(target, true);
+				current = target;
+			}
+
+			GUILayout.FlexibleSpace();
+			EditorGUILayout.EndHorizontal();
+			EditorGUILayout.EndVertical();
+
+			return current;
 		}
 
 		private class AssetPostprocessor : UnityEditor.AssetPostprocessor
@@ -115,7 +157,7 @@ namespace PhantasmicGames.SuperSingletonsEditor
 					if (currentSingleton == null)
 						EditorBuildSettings.AddConfigObject(configName, singleton, true);
 					else if (currentSingleton != singleton)
-						SetIsMain(singleton, type, false);
+						SetIsMain(singleton, false);
 				}
 			}
 		}
