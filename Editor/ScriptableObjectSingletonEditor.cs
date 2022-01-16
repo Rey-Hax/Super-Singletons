@@ -21,7 +21,7 @@ namespace PhantasmicGames.SuperSingletonsEditor
 			m_Type = target.GetType();
 			m_Name = m_Type.Name;
 			m_Label = new GUIContent($"Main '{m_Name}': ");
-			m_ConfigName = SuperSingletonsEditor.GetConfigName(target);
+			m_ConfigName = SuperSingletonsEditor.GetConfigName(m_Type);
 			EditorBuildSettings.TryGetConfigObject(m_ConfigName, out m_CurrentMainInstance);
 		}
 
