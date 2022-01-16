@@ -1,3 +1,16 @@
 {
-	"name": "PhantasmicGames.SuperSingletons"
+    "name": "PhantasmicGames.SuperSingletons",
+    "rootNamespace": "",
+    "references": [
+        "GUID:84d59d38f53b6334497472301532de94"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
