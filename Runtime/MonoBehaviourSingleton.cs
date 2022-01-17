@@ -9,7 +9,8 @@ namespace PhantasmicGames.SuperSingletons
 	[DisallowMultipleComponent]
 	public class MonoBehaviourSingleton<TMonoBehaviour> : MonoBehaviour where TMonoBehaviour : MonoBehaviour
 	{
-		private static string s_ConfigName => typeof(TMonoBehaviour).FullName;
+		internal static string configName => typeof(TMonoBehaviour).FullName;
+
 		private static TMonoBehaviour s_Instance;
 		private static readonly object s_Lock = new object();
 
@@ -29,9 +30,9 @@ namespace PhantasmicGames.SuperSingletons
 					lock (s_Lock)
 					{
 #if UNITY_EDITOR
-						EditorBuildSettings.TryGetConfigObject(s_ConfigName, out MonoBehaviour prefab);
+						EditorBuildSettings.TryGetConfigObject(configName, out MonoBehaviour prefab);
 #else
-						PrefabDatabase.instance.TryGetPrefab(typeof(TMonoBehaviour), out MonoBehaviour prefab);
+						PrefabDatabase.instance.TryGetPrefab(configName, out MonoBehaviour prefab);
 #endif
 						if (prefab)
 							s_Instance = Instantiate(prefab as TMonoBehaviour);
@@ -39,7 +40,6 @@ namespace PhantasmicGames.SuperSingletons
 							s_Instance = new GameObject($"{typeof(TMonoBehaviour).Name} - Singleton").AddComponent<TMonoBehaviour>();
 					}
 				}
-
 				return s_Instance;
 			}
 		}

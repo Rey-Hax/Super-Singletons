@@ -1,4 +1,3 @@
-using PhantasmicGames.Common;
 using PhantasmicGames.SuperSingletons;
 using System;
 using System.Collections.Generic;
@@ -13,78 +12,69 @@ using UnityObject = UnityEngine.Object;
 
 namespace PhantasmicGames.SuperSingletonsEditor 
 {
-
 	public class SuperSingletonsEditor
 	{
-		/// <summary>Does the path point to a singleton asset?</summary>
-		private static bool IsSingletonAsset(UnityObject obj, out Type singletonGenericDefinition, out UnityObject singleton)
+		private static bool IsSingletonAsset(UnityObject asset, out Type singletonGenericDefinition, out UnityObject singleton)
 		{
-			var result = false;
-			singletonGenericDefinition = null;
-			singleton = null;
-
-			if (obj is ScriptableObject)
+			if (asset is ScriptableObject)
 			{
-				result = IsScriptableObjectSingleton(obj as ScriptableObject, out singletonGenericDefinition);
-				singleton = obj;
-			}
-			else if (obj is GameObject)
-			{
-				result = IsMonoBehaviourSingletonPrefab(obj as GameObject, out singletonGenericDefinition, out MonoBehaviour monoBehaviour);
-				singleton = monoBehaviour;
-			}
-			else if (obj is MonoBehaviour)
-			{
-				result = IsMonoBehaviourSingleton(obj as MonoBehaviour, out singletonGenericDefinition);
-				singleton = obj;
-			}
-			return result;
-		}
-
-		public static bool IsScriptableObjectSingleton(ScriptableObject scriptableObject, out Type singletonGenericTypeDefinition)
-		{
-			return Utility.TypeInheritsGenericTypeDefinition(scriptableObject.GetType(), typeof(ScriptableObjectSingleton<>), out singletonGenericTypeDefinition);
-		}
-
-		public static bool IncludedInBuild(ScriptableObject scriptableObjectSingleton)
-		{
-			if (Utility.TypeInheritsGenericTypeDefinition(scriptableObjectSingleton.GetType(), typeof(ScriptableObjectSingleton<>), out Type type))
-			{
-				return (bool)type.GetProperty("includeInBuild", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(scriptableObjectSingleton);
-			}
-			throw new Exception("The ScriptableObject does not inherit ScriptableObjectSingleton<TScriptableObject>!");
-		}
-
-		public static bool IsMonoBehaviourSingletonPrefab(GameObject prefab, out Type singletonGenericTypeDefinition, out MonoBehaviour monoBehaviourSingleton)
-		{
-			foreach (var monoBehaviour in prefab.GetComponents<MonoBehaviour>())
-			{
-				if (IsMonoBehaviourSingleton(monoBehaviour, out singletonGenericTypeDefinition))
+				if (IsSingletonObject(asset, out singletonGenericDefinition))
 				{
-					monoBehaviourSingleton = monoBehaviour;
+					singleton = asset;
 					return true;
 				}
 			}
-			singletonGenericTypeDefinition = null;
-			monoBehaviourSingleton = null;
+			else if (asset is GameObject)
+			{
+				foreach (var monoBehaviour in (asset as GameObject).GetComponents<MonoBehaviour>())
+				{
+					if (IsSingletonObject(monoBehaviour, out singletonGenericDefinition))
+					{
+						singleton = monoBehaviour;
+						return true;
+					}
+				}
+			}
+			singletonGenericDefinition = null;
+			singleton = null;
 			return false;
 		}
 
-		public static bool IsMonoBehaviourSingleton(MonoBehaviour monoBehaviour, out Type singletonGenericTypeDefinition)
+		public static bool IsSingletonObject(UnityObject singletonObject, out Type singletonGenericType)
 		{
-			if (Utility.TypeInheritsGenericTypeDefinition(monoBehaviour.GetType(), typeof(MonoBehaviourSingleton<>), out singletonGenericTypeDefinition))
-				return true;
-			return false;
+			singletonGenericType = GetSingletonGenericType(singletonObject.GetType());
+			return singletonGenericType != null;
+		}
+
+		private static Type GetSingletonGenericType(Type type)
+		{
+			while (type != null)
+			{
+				if (type.IsGenericType)
+				{
+					var genericTypeDefinition = type.GetGenericTypeDefinition();
+					if (genericTypeDefinition == typeof(ScriptableObjectSingleton<>) || genericTypeDefinition == typeof(MonoBehaviourSingleton<>))
+						return type;
+				}
+				type = type.BaseType;
+			}
+			return null;
+		}
+
+		private static bool IncludedInBuild(ScriptableObject scriptableObjectSingleton)
+		{
+			var genericType = GetSingletonGenericType(scriptableObjectSingleton.GetType());
+			return (bool)genericType.GetProperty("includeInBuild", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(scriptableObjectSingleton);
 		}
 
 		public static string GetConfigName(Type singletonType)
 		{
-			if (!Utility.TypeInheritsGenericTypeDefinition(singletonType, typeof(ScriptableObjectSingleton<>), out Type genericTypeDefinition))
-				Utility.TypeInheritsGenericTypeDefinition(singletonType, typeof(MonoBehaviourSingleton<>), out genericTypeDefinition);
+			var singletonGenericType = GetSingletonGenericType(singletonType);
 
-			if (genericTypeDefinition == null)
+			if (singletonGenericType == null)
 				throw new Exception("'singletonType' does not derived from either ScriptableObjectSingleton<> or MonoBehaviourSingleton<>!");
-			return (string)genericTypeDefinition.GetProperty("s_ConfigName", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+
+			return (string)singletonGenericType.GetProperty("configName", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
 		}
 
 		public static void SetIsMain(UnityObject singletonAsset, bool value)
@@ -198,25 +188,27 @@ namespace PhantasmicGames.SuperSingletonsEditor
 
 			public void OnPostprocessBuild(BuildReport report)
 			{
-				AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(s_PrefabDatabase));
 				RemoveScriptableObjectSingletonsFromPreloadedAssets();
+				AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(s_PrefabDatabase));
 			}
 
 			private static ScriptableObject CreatePrefabDatabase()
 			{
-				var prefabs = new SerializableDictionary<SerializableType, MonoBehaviour>();
+				var prefabs = new Dictionary<string, MonoBehaviour>();
+
 				foreach (var type in TypeCache.GetTypesDerivedFrom(typeof(MonoBehaviourSingleton<>)))
 				{
 					var configName = GetConfigName(type);
 					if (EditorBuildSettings.TryGetConfigObject(configName, out MonoBehaviour prefab))
-						prefabs.Add(type, prefab);
+						prefabs.Add(configName, prefab);
 				}
 
 				var prefabDatabaseType = Type.GetType("PhantasmicGames.SuperSingletons.PrefabDatabase, PhantasmicGames.SuperSingletons, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null");
 				var instance = ScriptableObject.CreateInstance(prefabDatabaseType);
 
-				var prefabsField = prefabDatabaseType.GetField("m_Prefabs", BindingFlags.NonPublic | BindingFlags.Instance);
-				prefabsField.SetValue(instance, prefabs);
+				var bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance;
+				prefabDatabaseType.GetField("m_ConfigNames", bindingFlags).SetValue(instance, prefabs.Keys.ToList());
+				prefabDatabaseType.GetField("m_Prefabs", bindingFlags).SetValue(instance, prefabs.Values.ToList());
 
 				AssetDatabase.CreateAsset(instance, AssetDatabase.GenerateUniqueAssetPath("Assets/PrefabDatabase.asset"));
 
@@ -229,7 +221,7 @@ namespace PhantasmicGames.SuperSingletonsEditor
 				if (preloadedAssets == null)
 					return;
 
-				preloadedAssets.RemoveAll(a => (a is ScriptableObject && IsScriptableObjectSingleton(a as ScriptableObject, out _)));
+				preloadedAssets.RemoveAll(a => IsSingletonObject(a, out _));
 				PlayerSettings.SetPreloadedAssets(preloadedAssets.ToArray());
 			}
 		}

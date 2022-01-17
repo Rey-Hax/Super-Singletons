@@ -8,7 +8,8 @@ namespace PhantasmicGames.SuperSingletons
 {
 	public class ScriptableObjectSingleton<TScriptableObject> : ScriptableObject where TScriptableObject : ScriptableObject
 	{
-		private static string s_ConfigName => typeof(TScriptableObject).FullName;
+		internal static string configName => typeof(TScriptableObject).FullName;
+
 		private static TScriptableObject s_Instance;
 
 #pragma warning disable CS0414
@@ -21,7 +22,7 @@ namespace PhantasmicGames.SuperSingletons
 			{
 #if UNITY_EDITOR
 				if (s_Instance == null)
-					EditorBuildSettings.TryGetConfigObject(s_ConfigName, out s_Instance);
+					EditorBuildSettings.TryGetConfigObject(configName, out s_Instance);
 #endif
 				return s_Instance;
 			}
@@ -35,7 +36,7 @@ namespace PhantasmicGames.SuperSingletons
 		protected virtual void OnEnable()
 		{
 #if UNITY_EDITOR
-			if (EditorBuildSettings.TryGetConfigObject(s_ConfigName, out TScriptableObject result) && this == result)
+			if (EditorBuildSettings.TryGetConfigObject(configName, out TScriptableObject result) && this == result)
 				s_Instance = this as TScriptableObject;
 #else
 				if(s_Instance == null && m_IsMain)

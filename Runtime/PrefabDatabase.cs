@@ -1,14 +1,27 @@
-using PhantasmicGames.Common;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PhantasmicGames.SuperSingletons
 {
 	internal class PrefabDatabase : ScriptableObjectSingleton<PrefabDatabase>
 	{
-		[SerializeField] private SerializableDictionary<SerializableType, MonoBehaviour> m_Prefabs;
+		[SerializeField] private List<string> m_ConfigNames;
+		[SerializeField] private List<MonoBehaviour> m_Prefabs;
 
-		protected override bool includeInBuild => m_Prefabs.Count > 0;
+		internal bool TryGetPrefab(string configName, out MonoBehaviour prefab)
+		{
+			var index = m_ConfigNames.IndexOf(configName);
 
-		public bool TryGetPrefab(SerializableType type, out MonoBehaviour prefab) => m_Prefabs.TryGetValue(type, out prefab);
+			if (index >= 0)
+			{
+				prefab = m_Prefabs[index];
+				return true;
+			}
+			else
+			{
+				prefab = null;
+				return false;
+			}
+		}
 	}
 }
