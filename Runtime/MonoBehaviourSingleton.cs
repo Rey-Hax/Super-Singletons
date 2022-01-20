@@ -1,4 +1,7 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using System;
+using UnityEngine.Events;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -46,9 +49,13 @@ namespace PhantasmicGames.SuperSingletons
 
 		public static bool quitting { get; private set; }
 
+		protected virtual (bool value, bool callOnAwakeOnNewScene) persistScenes => (false, false);
+
+		private void CallOnAwake(Scene current, Scene next) => OnAwake();
+
 		private void Awake()
 		{
-			if (s_Instance != null && s_Instance != this)
+			if (s_Instance != this && s_Instance != null)
 			{
 				Destroy(gameObject);
 				return;
@@ -56,19 +63,30 @@ namespace PhantasmicGames.SuperSingletons
 			else
 				s_Instance = this as TMonoBehaviour;
 
-			quitting = false;
+			if (persistScenes.value)
+			{
+				DontDestroyOnLoad(gameObject);
+				if (persistScenes.callOnAwakeOnNewScene)
+					SceneManager.activeSceneChanged += CallOnAwake;
+			}
+
+			if (persistScenes.value && !persistScenes.callOnAwakeOnNewScene)
+				OnAwake();
 		}
 
-		/// <summary>
-		/// If overriding make sure to call base.OnDestroy() first
-		/// </summary>
+		protected virtual void OnAwake()
+		{
+		}
+
+		protected virtual void OnApplicationQuit()
+		{
+			quitting = true;
+		}
+
 		protected virtual void OnDestroy()
 		{
-			if (s_Instance == this)
-			{
-				quitting = true;
-				s_Instance = null;
-			}
+			if (persistScenes.callOnAwakeOnNewScene)
+				SceneManager.activeSceneChanged -= CallOnAwake;
 		}
 	}
 }
