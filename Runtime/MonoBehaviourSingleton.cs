@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System;
-using UnityEngine.Events;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -27,6 +26,11 @@ namespace PhantasmicGames.SuperSingletons
 			{
 				if (quitting)
 					return null;
+
+#if UNITY_EDITOR
+				if (!Application.isPlaying)
+					throw new Exception($"Getting the instance of '{typeof(TMonoBehaviour).Name}' is only supported in Play Mode");
+#endif
 
 				if (s_Instance == null)
 				{
