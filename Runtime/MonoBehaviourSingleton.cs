@@ -26,7 +26,6 @@ namespace PhantasmicGames.SuperSingletons
 			{
 				if (quitting)
 					return null;
-
 #if UNITY_EDITOR
 				if (!Application.isPlaying)
 					throw new Exception($"Getting the instance of '{typeof(TMonoBehaviour).Name}' is only supported in Play Mode");
@@ -36,15 +35,26 @@ namespace PhantasmicGames.SuperSingletons
 				{
 					lock (s_Lock)
 					{
+						foreach (var unverifiedInstance in FindObjectsOfType<TMonoBehaviour>())
+						{
+							if (s_Instance != null)
+								Destroy(unverifiedInstance.gameObject);
+							else if ((unverifiedInstance as MonoBehaviourSingleton<TMonoBehaviour>).m_IsMain)
+								s_Instance = unverifiedInstance;
+						}
+
+						if (s_Instance == null)
+						{
 #if UNITY_EDITOR
-						EditorBuildSettings.TryGetConfigObject(configName, out MonoBehaviour prefab);
+							EditorBuildSettings.TryGetConfigObject(configName, out MonoBehaviour prefab);
 #else
-						PrefabDatabase.instance.TryGetPrefab(configName, out MonoBehaviour prefab);
+							PrefabDatabase.instance.TryGetPrefab(configName, out MonoBehaviour prefab);
 #endif
-						if (prefab)
-							s_Instance = Instantiate(prefab as TMonoBehaviour);
-						else
-							s_Instance = new GameObject($"{typeof(TMonoBehaviour).Name} - Singleton").AddComponent<TMonoBehaviour>();
+							if (prefab)
+								s_Instance = Instantiate(prefab as TMonoBehaviour);
+							else
+								s_Instance = new GameObject($"{typeof(TMonoBehaviour).Name} - Singleton").AddComponent<TMonoBehaviour>();
+						}
 					}
 				}
 				return s_Instance;
