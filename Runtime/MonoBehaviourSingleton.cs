@@ -70,7 +70,7 @@ namespace PhantasmicGames.SuperSingletons
 					SceneManager.activeSceneChanged += CallOnAwake;
 			}
 
-			if (persistScenes.value && !persistScenes.callOnAwakeOnNewScene)
+			if (!persistScenes.value || persistScenes.value && !persistScenes.callOnAwakeOnNewScene)
 				OnAwake();
 		}
 
