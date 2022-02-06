@@ -1,0 +1,6 @@
+{
+	"name": "com.phantasmicgames.supersingletons",
+	"displayName": "Super Singletons",
+	"version": "1.0.0",
+	"description": "A Unity package for generic singletons"
+}
